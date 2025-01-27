@@ -194,6 +194,9 @@ powershell.exe -Win N -exec bypass -nop -command $cmd
 Start-Sleep 2
 #Remove-Item "$attackDir\EICAR.exe" -Force -ErrorAction Ignore
 #Remove-Item "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -ErrorAction Ignore
+#Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -ErrorAction Ignore
+#Remove-Item "c:\users\public\Desktop\evil_calc.lnk" -ErrorAction Ignore
+
 #Remove-Item "$home\Desktop\evil_calc.lnk" -ErrorAction Ignore
 
 

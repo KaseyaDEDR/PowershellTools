@@ -17,6 +17,8 @@ Write-Host "Removing Startup Link Persistence - EICAR"
 Remove-Item "$attackDir\EICAR.exe" -Force -ErrorAction Ignore
 Remove-Item "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -ErrorAction Ignore
 Remove-Item "$home\Desktop\evil_calc.lnk" -ErrorAction Ignore
+Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -ErrorAction Ignore
+Remove-Item "c:\users\public\Desktop\evil_calc.lnk" -ErrorAction Ignore
 
 Write-Host "Removing Scheduled Task Persistence"
 schtasks /delete /tn "T1053_005_OnLogon" /f >nul 2>&1
@@ -25,6 +27,6 @@ schtasks /delete /tn "T1053_005_OnStartup" /f >nul 2>&1
 Write-Host "Restarting Defender..."
 sc config WinDefend start= Auto >nul 2>&1
 sc start WinDefend >nul 2>&1
-Set-MpPreference -DisableRealtimeMonitoring $false
+Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Ignore
 
 Remove-Item -Path $attackDir -Recurse -force -ErrorAction Ignore
