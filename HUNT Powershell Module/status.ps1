@@ -342,3 +342,96 @@ function Get-ICLastScanTask {
 	$result['coverage'] = try { [math]::Round(($($result.accessibleCount)/$($result.totalItems)), 2) } catch { $null }
 	return [PSCustomObject]$result
 }
+
+function Get-ICTaskStatistics {
+	<#
+	.SYNOPSIS
+		Get summary statistics for tasks grouped by status
+	.DESCRIPTION
+		This function retrieves all tasks and provides a count summary grouped by status (Active, Complete, Error, Cancelled).
+		Useful for quick overview of task execution state in your Infocyte instance.
+	.PARAMETER TargetGroupId
+		Optional. Filter statistics to a specific target group.
+	.PARAMETER Days
+		Number of days to look back. Default is 7 days.
+	.EXAMPLE
+		Get-ICTaskStatistics
+		Returns task statistics for the last 7 days across all target groups.
+	.EXAMPLE
+		Get-ICTaskStatistics -Days 30
+		Returns task statistics for the last 30 days.
+	.EXAMPLE
+		Get-ICTaskStatistics -TargetGroupId "abc123-def456-..." -Days 14
+		Returns task statistics for a specific target group over the last 14 days.
+	.OUTPUTS
+		PSCustomObject with properties: TotalTasks, ActiveTasks, CompleteTasks, ErrorTasks, CancelledTasks, OtherTasks
+	#>
+	[CmdletBinding()]
+	param(
+		[parameter(ValueFromPipelineByPropertyName)]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+		[String]$TargetGroupId,
+		
+		[parameter()]
+		[ValidateRange(1, 365)]
+		[int]$Days = 7
+	)
+	
+	PROCESS {
+		Write-Verbose "Getting task statistics for last $Days days"
+		
+		# Build the where filter
+		$where = @{ and = @() }
+		$where['and'] += @{ createdOn = @{ gte = (Get-Date).ToUniversalTime().AddDays(-$Days).ToString("o") } }
+		$where['and'] += @{ archived = $false }
+		
+		if ($TargetGroupId) {
+			Write-Verbose "Filtering to TargetGroupId: $TargetGroupId"
+			$where['and'] += @{ targetGroupId = $TargetGroupId }
+		}
+		
+		# Get all tasks matching criteria
+		$tasks = Get-ICTask -where $where -NoLimit
+		
+		if (-NOT $tasks) {
+			Write-Warning "No tasks found matching criteria"
+			return [PSCustomObject]@{
+				TotalTasks = 0
+				ActiveTasks = 0
+				CompleteTasks = 0
+				ErrorTasks = 0
+				CancelledTasks = 0
+				OtherTasks = 0
+				TimeRangeStart = (Get-Date).AddDays(-$Days).ToString("o")
+				TimeRangeEnd = (Get-Date).ToString("o")
+			}
+		}
+		
+		# Group and count by status
+		$grouped = $tasks | Group-Object -Property status
+		$stats = @{
+			TotalTasks = $tasks.Count
+			ActiveTasks = 0
+			CompleteTasks = 0
+			ErrorTasks = 0
+			CancelledTasks = 0
+			OtherTasks = 0
+			TimeRangeStart = (Get-Date).AddDays(-$Days).ToString("o")
+			TimeRangeEnd = (Get-Date).ToString("o")
+		}
+		
+		foreach ($group in $grouped) {
+			switch ($group.Name) {
+				"Active" { $stats.ActiveTasks = $group.Count }
+				"Complete" { $stats.CompleteTasks = $group.Count }
+				"Error" { $stats.ErrorTasks = $group.Count }
+				"Cancelled" { $stats.CancelledTasks = $group.Count }
+				default { $stats.OtherTasks += $group.Count }
+			}
+		}
+		
+		Write-Verbose "Found $($stats.TotalTasks) total tasks: Active=$($stats.ActiveTasks), Complete=$($stats.CompleteTasks), Error=$($stats.ErrorTasks), Cancelled=$($stats.CancelledTasks), Other=$($stats.OtherTasks)"
+		
+		return [PSCustomObject]$stats
+	}
+}
