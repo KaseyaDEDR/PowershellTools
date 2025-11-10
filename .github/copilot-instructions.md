@@ -111,10 +111,12 @@ Follow existing patterns (see Get-LockingProcs.ps1):
 - **Entry Point**: `InfocyteHUNTAPI.psm1` loads all component scripts via dot-sourcing
 - **Exported Functions**: Defined in `InfocyteHUNTAPI.psd1` FunctionsToExport array
 - **Adding New Functions**:
-  1. Create/modify appropriate component file (auth.ps1, scan.ps1, etc.)
-  2. Add function name to FunctionsToExport in .psd1 manifest
-  3. Increment ModuleVersion in .psd1
-  4. Add tests to tests/ directory
+  1. Create/modify appropriate component file (auth.ps1, scan.ps1, status.ps1, data.ps1, etc.)
+  2. Add function name to FunctionsToExport array in .psd1 manifest (maintain alphabetical grouping)
+  3. Increment ModuleVersion in .psd1 (format: Major.Minor.Patch, e.g., 2.0.7 → 2.0.8)
+  4. Create corresponding test file in tests/ directory (e.g., functionname.test.ps1)
+  5. Verify export: `Import-Module ./InfocyteHUNTAPI.psd1 -Force; Get-Command YourFunction`
+  6. Test help documentation: `Get-Help YourFunction -Detailed`
 
 ### API Request Patterns
 - Use `Invoke-ICAPI` and `Get-ICAPI` helper functions from requestHelpers.ps1
@@ -154,9 +156,12 @@ cd "HUNT Powershell Module/tests"
 - Tests are integration tests, not unit tests
 
 ### Before Committing
-- No formal linting configured, but follow existing code style
+- **PSScriptAnalyzer**: Available in environment (version 1.24.0)
+  - Run: `pwsh -Command "Invoke-ScriptAnalyzer -Path ./filename.ps1 -Severity Warning,Error"`
+  - Follow existing code patterns; some warnings (like plural nouns) are acceptable if consistent with codebase
 - Run Pester tests if modifying InfocyteHUNTAPI module
 - Test with PowerShell 5.1 and 7.x if possible
+- Verify function exports correctly: `Get-Command -Module InfocyteHUNTAPI | Where-Object { $_.Name -eq 'YourFunction' }`
 
 ## Known Issues and Workarounds
 
@@ -203,6 +208,33 @@ Set-ICToken -Instance "your-instance" -Token "your-api-token" -Save
 - InfocyteHUNTAPI requires 5.1+
 - NetworkDiagnostics requires 3.0+
 - AgentDeployment requires 2.0+ (Windows 7+)
+
+## Development Workflow Summary
+
+### Quick Validation Checklist
+When adding or modifying functions in InfocyteHUNTAPI module:
+```powershell
+# 1. Import module and verify export
+cd "HUNT Powershell Module"
+Import-Module ./InfocyteHUNTAPI.psd1 -Force
+Get-Command -Module InfocyteHUNTAPI | Where-Object { $_.Name -eq 'YourFunction' }
+
+# 2. Check help documentation
+Get-Help YourFunction -Detailed
+
+# 3. Run PSScriptAnalyzer
+Invoke-ScriptAnalyzer -Path ./yourfile.ps1 -Severity Warning,Error | Format-Table -AutoSize
+
+# 4. Run tests (requires API token)
+cd tests
+.\RunTests.ps1
+```
+
+### Common PSScriptAnalyzer Warnings
+- **Plural nouns** (PSUseSingularNouns): Acceptable if consistent with existing functions (e.g., Get-ICTaskItems)
+- **Empty catch blocks** (PSAvoidUsingEmptyCatchBlock): Existing in codebase; add error handling when modifying
+- **Unapproved verbs** (PSUseApprovedVerbs): Private functions with underscore prefix are acceptable
+- **Cmdlet aliases** (PSAvoidUsingCmdletAliases): Expand aliases in new code
 
 ## Agent Deployment Notes
 
@@ -261,12 +293,19 @@ cd "HUNT Powershell Module/tests"
 - `.psd1` - PowerShell module manifest (metadata)
 
 ### When Adding Features
-1. Determine which component file to modify (auth, scan, data, etc.)
-2. Follow existing function patterns (CmdletBinding, proper parameters)
-3. Add to FunctionsToExport in .psd1 if creating new public function
-4. Create corresponding .test.ps1 file in tests/ directory
-5. Update version in .psd1 manifest
-6. Test with both PowerShell 5.1 and 7.x if possible
+1. Determine which component file to modify (auth.ps1, scan.ps1, status.ps1, data.ps1, etc.)
+2. Follow existing function patterns:
+   - Use `[CmdletBinding()]` attribute
+   - Include comment-based help (`.SYNOPSIS`, `.DESCRIPTION`, `.PARAMETER`, `.EXAMPLE`, `.OUTPUTS`)
+   - Add proper parameter validation and aliases
+   - Use `PROCESS {}` block for pipeline support
+3. If creating new public function, add to FunctionsToExport in .psd1 manifest
+4. Increment module version in .psd1 (Major.Minor.Patch format)
+5. Create corresponding .test.ps1 file in tests/ directory
+6. Verify with: `Import-Module ./InfocyteHUNTAPI.psd1 -Force; Get-Command YourFunction`
+7. Check help: `Get-Help YourFunction -Detailed`
+8. Run PSScriptAnalyzer: `Invoke-ScriptAnalyzer -Path ./filename.ps1 -Severity Warning,Error`
+9. Test with both PowerShell 5.1 and 7.x if possible
 
 ## Additional Resources
 
