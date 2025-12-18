@@ -1,5 +1,6 @@
 # EDR Attack Simulator - Post-Demo Cleanup Script
 # Run this after demos to ensure complete restoration
+# Compatible with Windows 10, Windows 11, Server 2016+
 
 If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "[Error] You need Administrator rights to run this cleanup script!"
@@ -13,31 +14,51 @@ Write-Host "Removing all persistence mechanisms and artifacts...`n"
 
 # Stop any running processes
 Write-Host "[1/12] Stopping malicious processes..."
-Stop-Process -Name AttackSim* -Force -ErrorAction Ignore
-Stop-Process -Name calc -Force -ErrorAction Ignore
-Get-Process | Where-Object {$_.Path -like "*$attackDir*"} | Stop-Process -Force -ErrorAction Ignore
+try {
+    Stop-Process -Name AttackSim* -Force -ErrorAction Ignore
+    Stop-Process -Name calc -Force -ErrorAction Ignore
+    Get-Process | Where-Object {$_.Path -like "*$attackDir*"} | Stop-Process -Force -ErrorAction Ignore
+} catch {
+    # Silently continue if no processes found
+}
 
 # Registry Run Keys
 Write-Host "[2/12] Removing Registry Run keys..."
-REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f 2>$null
-Remove-Item "HKCU:\Software\Classes\RedTeamTest" -Force -ErrorAction Ignore
+try {
+    REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f 2>$null
+    Remove-Item "HKCU:\Software\Classes\RedTeamTest" -Force -ErrorAction Ignore
+} catch {
+    # Key may not exist
+}
 
 # RunOnce Keys
 Write-Host "[3/12] Removing RunOnce keys..."
-Remove-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "NextRun" -Force -ErrorAction Ignore
+try {
+    Remove-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "NextRun" -Force -ErrorAction Ignore
+} catch {
+    # Key may not exist
+}
 
 # EICAR Files
 Write-Host "[4/12] Removing EICAR test files..."
-Remove-Item "$AttackDir\EICAR.exe" -Force -ErrorAction Ignore
-Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe" -Force -ErrorAction Ignore
-Get-ChildItem -Path "C:\Users" -Recurse -Filter "EICAR.exe" -ErrorAction Ignore | Remove-Item -Force -ErrorAction Ignore
+try {
+    Remove-Item "$AttackDir\EICAR.exe" -Force -ErrorAction Ignore
+    Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe" -Force -ErrorAction Ignore
+    Get-ChildItem -Path "C:\Users" -Recurse -Filter "EICAR.exe" -ErrorAction Ignore | Remove-Item -Force -ErrorAction Ignore
+} catch {
+    # Files may not exist
+}
 
 # Shortcut Links
 Write-Host "[5/12] Removing malicious shortcuts..."
-Remove-Item "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -Force -ErrorAction Ignore
-Remove-Item "$home\Desktop\evil_calc.lnk" -Force -ErrorAction Ignore
-Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -Force -ErrorAction Ignore
-Remove-Item "C:\Users\Public\Desktop\evil_calc.lnk" -Force -ErrorAction Ignore
+try {
+    Remove-Item "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -Force -ErrorAction Ignore
+    Remove-Item "$home\Desktop\evil_calc.lnk" -Force -ErrorAction Ignore
+    Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -Force -ErrorAction Ignore
+    Remove-Item "C:\Users\Public\Desktop\evil_calc.lnk" -Force -ErrorAction Ignore
+} catch {
+    # Shortcuts may not exist
+}
 
 # Scheduled Tasks
 Write-Host "[6/12] Removing scheduled tasks..."
@@ -58,13 +79,17 @@ reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "Di
 
 # Downloaded binaries
 Write-Host "[9/12] Removing downloaded tools..."
-Remove-Item "$attackDir\bad.exe" -Force -ErrorAction Ignore
-Remove-Item "$attackDir\procdump.exe" -Force -ErrorAction Ignore
-Remove-Item "$attackDir\lsass.dmp" -Force -ErrorAction Ignore
-Remove-Item "$attackDir\*.pdf.exe" -Force -ErrorAction Ignore
-Remove-Item "$attackDir\WindowsUpdate*.exe" -Force -ErrorAction Ignore
-Remove-Item "$attackDir\Default_File_Path.ps1" -Force -ErrorAction Ignore
-Remove-Item ".\test.txt" -Force -ErrorAction Ignore
+try {
+    Remove-Item "$attackDir\bad.exe" -Force -ErrorAction Ignore
+    Remove-Item "$attackDir\procdump.exe" -Force -ErrorAction Ignore
+    Remove-Item "$attackDir\lsass.dmp" -Force -ErrorAction Ignore
+    Remove-Item "$attackDir\*.pdf.exe" -Force -ErrorAction Ignore
+    Remove-Item "$attackDir\WindowsUpdate*.exe" -Force -ErrorAction Ignore
+    Remove-Item "$attackDir\Default_File_Path.ps1" -Force -ErrorAction Ignore
+    Remove-Item ".\test.txt" -Force -ErrorAction Ignore
+} catch {
+    # Files may not exist
+}
 
 # Defender Settings
 Write-Host "[10/12] Restoring Windows Defender..."
@@ -82,12 +107,16 @@ Write-Host "[11/12] Disabling WSMan CredSSP..."
 try {
     Disable-WSManCredSSP -Role Server -ErrorAction Ignore
 } catch {
-    # Already disabled
+    # Already disabled or not configured
 }
 
 # Remove Attack Directory
 Write-Host "[12/12] Removing attack directory..."
-Remove-Item -Path $attackDir -Recurse -Force -ErrorAction Ignore
+try {
+    Remove-Item -Path $attackDir -Recurse -Force -ErrorAction Ignore
+} catch {
+    # Directory may not exist
+}
 
 # Verification
 Write-Host "`n=== Verification ===" -ForegroundColor Cyan
@@ -95,17 +124,29 @@ Write-Host "`n=== Verification ===" -ForegroundColor Cyan
 $issues = @()
 
 # Check for leftover scheduled tasks
-if (schtasks /query /tn "T1053_005_OnLogon" 2>$null) { $issues += "Scheduled task T1053_005_OnLogon still exists" }
-if (schtasks /query /tn "T1053_005_OnStartup" 2>$null) { $issues += "Scheduled task T1053_005_OnStartup still exists" }
+if (schtasks /query /tn "T1053_005_OnLogon" 2>$null) { 
+    $issues += "Scheduled task T1053_005_OnLogon still exists" 
+}
+if (schtasks /query /tn "T1053_005_OnStartup" 2>$null) { 
+    $issues += "Scheduled task T1053_005_OnStartup still exists" 
+}
 
 # Check for registry keys
 if (Test-Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run") {
-    $runKey = Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -ErrorAction Ignore
-    if ($runKey."Red Team") { $issues += "Registry Run key 'Red Team' still exists" }
+    try {
+        $runKey = Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -ErrorAction Ignore
+        if ($runKey."Red Team") { 
+            $issues += "Registry Run key 'Red Team' still exists" 
+        }
+    } catch {
+        # Key doesn't exist or can't be read
+    }
 }
 
 # Check for attack directory
-if (Test-Path $attackDir) { $issues += "Attack directory still exists at $attackDir" }
+if (Test-Path $attackDir) { 
+    $issues += "Attack directory still exists at $attackDir" 
+}
 
 # Check for EICAR
 if (Test-Path "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe") {
