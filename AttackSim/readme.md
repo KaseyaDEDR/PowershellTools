@@ -1,5 +1,3 @@
-```markdown
-```
 # Datto EDR Behavioral Attack Simulator
 
 A comprehensive attack simulation script designed to test EDR detection capabilities across the MITRE ATT&CK framework. Built specifically for customer demonstrations and security validation testing.
