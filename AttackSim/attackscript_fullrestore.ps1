@@ -14,51 +14,31 @@ Write-Host "Removing all persistence mechanisms and artifacts...`n"
 
 # Stop any running processes
 Write-Host "[1/12] Stopping malicious processes..."
-try {
-    Stop-Process -Name AttackSim* -Force -ErrorAction Ignore
-    Stop-Process -Name calc -Force -ErrorAction Ignore
-    Get-Process | Where-Object {$_.Path -like "*$attackDir*"} | Stop-Process -Force -ErrorAction Ignore
-} catch {
-    # Silently continue if no processes found
-}
+Stop-Process -Name AttackSim* -Force -ErrorAction Ignore
+Stop-Process -Name calc -Force -ErrorAction Ignore
+Get-Process -ErrorAction Ignore | Where-Object {$_.Path -like "*$attackDir*"} | Stop-Process -Force -ErrorAction Ignore
 
 # Registry Run Keys
 Write-Host "[2/12] Removing Registry Run keys..."
-try {
-    REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f 2>$null
-    Remove-Item "HKCU:\Software\Classes\RedTeamTest" -Force -ErrorAction Ignore
-} catch {
-    # Key may not exist
-}
+REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f 2>$null
+Remove-Item "HKCU:\Software\Classes\RedTeamTest" -Force -ErrorAction Ignore
 
 # RunOnce Keys
 Write-Host "[3/12] Removing RunOnce keys..."
-try {
-    Remove-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "NextRun" -Force -ErrorAction Ignore
-} catch {
-    # Key may not exist
-}
+Remove-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "NextRun" -Force -ErrorAction Ignore
 
 # EICAR Files
 Write-Host "[4/12] Removing EICAR test files..."
-try {
-    Remove-Item "$AttackDir\EICAR.exe" -Force -ErrorAction Ignore
-    Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe" -Force -ErrorAction Ignore
-    Get-ChildItem -Path "C:\Users" -Recurse -Filter "EICAR.exe" -ErrorAction Ignore | Remove-Item -Force -ErrorAction Ignore
-} catch {
-    # Files may not exist
-}
+Remove-Item "$AttackDir\EICAR.exe" -Force -ErrorAction Ignore
+Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe" -Force -ErrorAction Ignore
+Get-ChildItem -Path "C:\Users" -Recurse -Filter "EICAR.exe" -ErrorAction Ignore | Remove-Item -Force -ErrorAction Ignore
 
 # Shortcut Links
 Write-Host "[5/12] Removing malicious shortcuts..."
-try {
-    Remove-Item "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -Force -ErrorAction Ignore
-    Remove-Item "$home\Desktop\evil_calc.lnk" -Force -ErrorAction Ignore
-    Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -Force -ErrorAction Ignore
-    Remove-Item "C:\Users\Public\Desktop\evil_calc.lnk" -Force -ErrorAction Ignore
-} catch {
-    # Shortcuts may not exist
-}
+Remove-Item "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -Force -ErrorAction Ignore
+Remove-Item "$home\Desktop\evil_calc.lnk" -Force -ErrorAction Ignore
+Remove-Item "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -Force -ErrorAction Ignore
+Remove-Item "C:\Users\Public\Desktop\evil_calc.lnk" -Force -ErrorAction Ignore
 
 # Scheduled Tasks
 Write-Host "[6/12] Removing scheduled tasks..."
@@ -79,44 +59,27 @@ reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "Di
 
 # Downloaded binaries
 Write-Host "[9/12] Removing downloaded tools..."
-try {
-    Remove-Item "$attackDir\bad.exe" -Force -ErrorAction Ignore
-    Remove-Item "$attackDir\procdump.exe" -Force -ErrorAction Ignore
-    Remove-Item "$attackDir\lsass.dmp" -Force -ErrorAction Ignore
-    Remove-Item "$attackDir\*.pdf.exe" -Force -ErrorAction Ignore
-    Remove-Item "$attackDir\WindowsUpdate*.exe" -Force -ErrorAction Ignore
-    Remove-Item "$attackDir\Default_File_Path.ps1" -Force -ErrorAction Ignore
-    Remove-Item ".\test.txt" -Force -ErrorAction Ignore
-} catch {
-    # Files may not exist
-}
+Remove-Item "$attackDir\bad.exe" -Force -ErrorAction Ignore
+Remove-Item "$attackDir\procdump.exe" -Force -ErrorAction Ignore
+Remove-Item "$attackDir\lsass.dmp" -Force -ErrorAction Ignore
+Remove-Item "$attackDir\*.pdf.exe" -Force -ErrorAction Ignore
+Remove-Item "$attackDir\WindowsUpdate*.exe" -Force -ErrorAction Ignore
+Remove-Item "$attackDir\Default_File_Path.ps1" -Force -ErrorAction Ignore
+Remove-Item ".\test.txt" -Force -ErrorAction Ignore
 
 # Defender Settings
 Write-Host "[10/12] Restoring Windows Defender..."
 sc.exe config WinDefend start= Auto 2>$null
 sc.exe start WinDefend 2>$null
-try {
-    Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Stop
-    Write-Host "  └─ Real-time monitoring re-enabled" -ForegroundColor Green
-} catch {
-    Write-Host "  └─ Defender settings protected (Tamper Protection active)" -ForegroundColor Yellow
-}
+Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Ignore
 
 # WSMan CredSSP
 Write-Host "[11/12] Disabling WSMan CredSSP..."
-try {
-    Disable-WSManCredSSP -Role Server -ErrorAction Ignore
-} catch {
-    # Already disabled or not configured
-}
+Disable-WSManCredSSP -Role Server -ErrorAction Ignore
 
 # Remove Attack Directory
 Write-Host "[12/12] Removing attack directory..."
-try {
-    Remove-Item -Path $attackDir -Recurse -Force -ErrorAction Ignore
-} catch {
-    # Directory may not exist
-}
+Remove-Item -Path $attackDir -Recurse -Force -ErrorAction Ignore
 
 # Verification
 Write-Host "`n=== Verification ===" -ForegroundColor Cyan
@@ -132,14 +95,10 @@ if (schtasks /query /tn "T1053_005_OnStartup" 2>$null) {
 }
 
 # Check for registry keys
-if (Test-Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run") {
-    try {
-        $runKey = Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -ErrorAction Ignore
-        if ($runKey."Red Team") { 
-            $issues += "Registry Run key 'Red Team' still exists" 
-        }
-    } catch {
-        # Key doesn't exist or can't be read
+if (Test-Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -ErrorAction Ignore) {
+    $runKey = Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -ErrorAction Ignore
+    if ($runKey -and $runKey."Red Team") { 
+        $issues += "Registry Run key 'Red Team' still exists" 
     }
 }
 
@@ -154,10 +113,10 @@ if (Test-Path "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICA
 }
 
 if ($issues.Count -eq 0) {
-    Write-Host "✓ All artifacts removed successfully!" -ForegroundColor Green
-    Write-Host "✓ System restored to clean state" -ForegroundColor Green
+    Write-Host "All artifacts removed successfully" -ForegroundColor Green
+    Write-Host "System restored to clean state" -ForegroundColor Green
 } else {
-    Write-Host "⚠ Some items may need manual cleanup:" -ForegroundColor Yellow
+    Write-Host "Some items may need manual cleanup:" -ForegroundColor Yellow
     foreach ($issue in $issues) {
         Write-Host "  - $issue" -ForegroundColor Yellow
     }
